@@ -314,7 +314,7 @@
   const mistakes = [7,3,17,19,13].map(i => ({slot:questions[i].visual,question:questions[i]}));
   const resolve = (v,lang) => v?.localized ? v[lang] : Array.isArray(v) ? v.map(x=>resolve(x,lang)) : v && typeof v==='object' ? Object.fromEntries(Object.entries(v).map(([k,x])=>[k,resolve(x,lang)])) : v;
   for (const lang of ['en','ru','he','th']) window.translations[lang].packing = resolve({ui, titles:specs.map(x=>x[1]), specs, materials, materialCards, content, rules, questions, mistakes},lang);
-  const photo = (n,alt) => ({src:n<=7?`./assets/packing/optimized/photo_${n}.webp`:`./assets/packing/photo_${n}_2026-10-10_03-01-28.jpg`,alt:Object.fromEntries(['en','ru','he','th'].map(lang=>[lang,resolve(alt,lang)]))});
+  const photo = (n,alt) => ({src:n<=7?`./photo_${n}.webp`:`./photo_${n}_2026-10-10_03-01-28.jpg`,alt:Object.fromEntries(['en','ru','he','th'].map(lang=>[lang,resolve(alt,lang)]))});
   window.packingAssets = {
     cleaner:photo(1, rules.optionA), overview:photo(2,L('White, blue and green bags','Белый, синий и зелёный пакеты','שקיות לבנות, כחולות וירוקות','ถุงสีขาว สีฟ้า และสีเขียว')),
     ice:photo(3,L('Ice used in the store','Лёд, используемый в магазине','הקרח שמשתמשים בו בחנות','น้ำแข็งที่ใช้ในร้าน')), trolley:photo(4,L('Food in the upper basket; household chemicals in the lower basket','Еда в верхней корзине, бытовая химия в нижней','מזון בסל העליון; חומרי ניקוי בסל התחתון','อาหารในตะกร้าบน สารเคมีในตะกร้าล่าง')),
