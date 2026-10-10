@@ -639,10 +639,10 @@ function renderModuleCards() {
     button.type = 'button'; button.className = 'module-card'; button.dataset.module = id;
     const title = document.createElement('strong'); title.textContent = module.title(currentLanguage);
     const description = document.createElement('span'); description.textContent = module.description?.(currentLanguage) || '';
-    const count = document.createElement('small'); count.textContent = copy.metadata.replace('{pages}', module.screens.length - 1).replace('{questions}', module.knowledge(currentLanguage).questions.length);
+    const count = document.createElement('small'); count.textContent = copy.metadata.replace('{questions}', module.knowledge(currentLanguage).questions.length);
     if(currentLanguage==='ru'){
       const form=(n,one,few,many)=>n%100>=11&&n%100<=14?many:n%10===1?one:n%10>=2&&n%10<=4?few:many;
-      count.textContent=count.textContent.replace('уроков',form(module.screens.length-1,'урок','урока','уроков')).replace('вопросов',form(module.knowledge(currentLanguage).questions.length,'вопрос','вопроса','вопросов'));
+      count.textContent=count.textContent.replace('вопросов',form(module.knowledge(currentLanguage).questions.length,'вопрос','вопроса','вопросов'));
     }
     const top = document.createElement('span'); top.className = 'module-card__top';
     const icon = document.createElement('span'); icon.className = 'module-card__icon'; icon.setAttribute('aria-hidden','true');

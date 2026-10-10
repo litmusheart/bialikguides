@@ -116,7 +116,7 @@
   };
   Object.assign(ui, {
     packing: L('Packaging', 'Упаковка', 'אריזה', 'การแพ็กสินค้า'),
-    metadata: L('{pages} pages · {questions} questions', '{pages} стр. · {questions} вопросов', '{pages} עמודים · {questions} שאלות', '{pages} หน้า · {questions} คำถาม'),
+    metadata: L('Guide · {questions} questions', 'Гайд · {questions} вопросов', 'מדריך · {questions} שאלות', 'คู่มือ · {questions} คำถาม'),
     perfect: L('Excellent work. Apply these checks to every order.', 'Отличная работа. Применяй эти проверки к каждому заказу.', 'עבודה מצוינת. מיישמים את הבדיקות בכל הזמנה.', 'ทำได้ดีมาก ใช้การตรวจเหล่านี้กับทุกออเดอร์'),
     example: L('Store example', 'Пример из магазина', 'דוגמה מהחנות', 'ตัวอย่างจากร้าน'),
     materialHelp: L('Tap a bag to see what belongs inside.', 'Нажми на пакет, чтобы узнать, для чего он нужен.', 'לחצו על שקית כדי לראות למה היא מיועדת.', 'แตะถุงเพื่อดูว่าใช้กับสินค้าอะไร')
@@ -197,7 +197,7 @@
   ui.intro = L("Short, practical lessons for our team.","Короткие практические уроки для нашей команды.","הדרכות קצרות ומעשיות לצוות שלנו.","บทเรียนสั้น ๆ ที่ใช้ได้จริงสำหรับทีมของเรา");
   ui.newBadge = L("NEW","НОВОЕ","חדש","ใหม่");
   ui.author = L("Made with love by Alina Krupitskaia ❤️","Сделано с любовью Алиной Крупицкой ❤️","נעשה באהבה על ידי אלינה קרופיצקי ❤️","ทำด้วยความรักโดย Alina Krupitskaia ❤️");
-  ui.metadata = L("{pages} lessons · {questions} questions","{pages} уроков · {questions} вопросов","{pages} שיעורים · {questions} שאלות","{pages} บทเรียน · {questions} คำถาม");
+  ui.metadata = L("Guide · {questions} questions","Гайд · {questions} вопросов","מדריך · {questions} שאלות","คู่มือ · {questions} คำถาม");
   rules.togetherTitle = L("Can go together","Можно вместе","אפשר יחד","ใส่ด้วยกันได้");
   rules.separateTitle = L("Keep separate","Нужно разделять","צריך להפריד","ต้องแยก");
   rules.compatible = L("Two sealed, sturdy ready-to-eat products","Два герметично закрытых, нехрупких готовых продукта","שני מוצרי מזון מוכנים לאכילה, סגורים היטב ולא שבירים","อาหารพร้อมกินสองชิ้นที่ปิดสนิทและไม่เปราะบาง");
