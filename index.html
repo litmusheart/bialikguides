@@ -14,8 +14,17 @@
   <link rel="stylesheet" href="./multilingual.css">
   <link rel="stylesheet" href="./targeted.css">
   <link rel="stylesheet" href="./step-experience.css">
+  <link rel="stylesheet" href="./modules.css?v=20261010.7">
 </head>
-<body>
+<body class="module-selecting">
+  <section class="module-home" id="moduleHome"><div class="wrap">
+    <header class="portal-brand" aria-label="Wolt Market Bialik"><span>Wolt Market</span><b>Bialik</b></header>
+    <h1 data-i18n="packing.ui.choose"></h1>
+    <p data-i18n="packing.ui.intro"></p>
+    <div class="module-cards" id="moduleCards"></div>
+    <footer class="portal-footer"><p data-i18n="packing.ui.author"></p><span dir="ltr">@litmusheart</span></footer>
+  </div></section>
+  <button type="button" class="missed-rule-link module-back" id="moduleBack" data-i18n="packing.ui.topics"></button>
   <div class="language-gate" id="languageGate" role="dialog" aria-modal="true">
     <div class="language-gate__panel">
       <p class="language-gate__eyebrow" data-i18n="meta.brand"></p>
@@ -40,7 +49,6 @@
       <h1><span data-i18n="hero.peak"></span><br><span data-i18n="hero.hours"></span></h1>
       <p class="hero__intro" data-i18n="hero.intro"></p>
       <div class="hero__rule" data-i18n="hero.rule"></div>
-      <p class="hero__signature" data-i18n="signature"></p>
       <a class="scroll-cue" href="#introduction"><span data-i18n="hero.start"></span><span>↓</span></a>
     </div>
   </header>
@@ -260,8 +268,8 @@
         <div class="scenario-quiz" id="scenarioQuiz">
           <div class="scenario-quiz__progress"><span id="questionCount"></span><span id="quizScore"></span></div>
           <div class="scenario-quiz__bar"><span id="quizProgress"></span></div>
-          <div id="questionPanel"><h3 id="questionText"></h3><div class="scenario-answers" id="scenarioAnswers"></div><div class="answer-feedback" id="answerFeedback" aria-live="polite"></div><button class="next-question" id="nextQuestion" type="button"></button></div>
-          <div class="quiz-complete" id="quizComplete" hidden><strong id="finalScore"></strong><h3 data-i18n="knowledge.ready"></h3><p class="perfect-score-message" id="perfectScoreMessage" hidden></p><div id="missedRules"></div></div>
+          <div id="questionPanel"><h3 id="questionText"></h3><div id="quizVisual" hidden></div><p id="quizInstruction" hidden></p><div class="scenario-answers" id="scenarioAnswers"></div><button type="button" class="next-question" id="quizSubmit" hidden></button><div class="answer-feedback" id="answerFeedback" aria-live="polite"></div><button class="next-question" id="nextQuestion" type="button"></button></div>
+          <div class="quiz-complete" id="quizComplete" hidden><strong id="finalScore"></strong><h3 data-i18n="knowledge.ready"></h3><p class="perfect-score-message" id="perfectScoreMessage" hidden></p><div id="missedRules"></div><button type="button" class="next-question show" id="packingRetry" hidden></button><div id="photoQuizPlaceholder" hidden></div></div>
         </div>
       </div>
     </section>
@@ -272,10 +280,12 @@
   </aside>
   <nav class="step-nav" id="stepNav" aria-label="Training navigation">
     <button class="step-nav__button" id="previousScreen" type="button" aria-label="Previous screen">←</button>
-    <div class="step-nav__progress"><span id="screenCount"></span><div id="screenDots" aria-hidden="true"></div></div>
+    <div class="step-nav__progress"><b id="activeModuleLabel"></b><span id="screenCount"></span><div id="screenDots" aria-hidden="true"></div></div>
     <button class="step-nav__button" id="nextScreen" type="button" aria-label="Next screen">→</button>
   </nav>
-  <script src="./translations.js"></script>
-  <script src="./training.js"></script>
+  <script src="./translations.js?v=20261010.7"></script>
+  <script src="./packing-content.js?v=20261010.7"></script>
+  <script src="./packing.js?v=20261010.7"></script>
+  <script src="./training.js?v=20261010.7"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ const handwritingCorrectIndex = 2;
 let celebrationPlayed = false;
 let reviewTargetIndex = null;
 
-const trainingSections = [...document.querySelectorAll('main .section')];
+const trainingSections = [...document.querySelectorAll('main .section:not(.packing-screen)[data-step-key]')];
 const revealItems = [...document.querySelectorAll('.reveal')];
 const trainingProgress = document.querySelector('#trainingProgress');
 const progressCount = document.querySelector('#progressCount');
@@ -24,7 +24,27 @@ const languageGateTitle = document.querySelector('#languageGateTitle');
 const languageOptions = document.querySelector('#languageOptions');
 const languageSwitcher = document.querySelector('#languageSwitcher');
 const languageMenu = document.querySelector('#languageMenu');
-const trainingScreens = [...document.querySelectorAll('[data-training-screen]')];
+const peakScreens = [...document.querySelectorAll('[data-training-screen]:not(.packing-screen)')];
+let trainingScreens = peakScreens;
+const moduleRegistry = new Map([
+  ['peak', { id: 'peak', screens: peakScreens, title: () => 'Peak Hours',
+    description: lang => translations[lang].packing.ui.peakDescription,
+    knowledge: lang => translations[lang].knowledge }],
+  ['packing', { ...window.packingModule, screens: [...window.packingModule.screens, document.querySelector('#knowledgeCheck')] }]
+]);
+let activeModule = 'peak';
+const moduleStates = new Map();
+const screenScroll = new Map();
+function rememberScroll() {
+  const screen = trainingScreens[activeScreen];
+  if (screen?.classList.contains('is-active') && moduleHome.hidden) screenScroll.set(`${activeModule}:${screen.id}`, screen.scrollTop);
+}
+const moduleHome = document.querySelector('#moduleHome');
+const moduleCards = document.querySelector('#moduleCards');
+const moduleBack = document.querySelector('#moduleBack');
+function knowledgeCopy() { return moduleRegistry.get(activeModule).knowledge(currentLanguage); }
+function navigationLocked() { return !moduleHome.hidden || document.body.classList.contains('language-locked'); }
+
 const stepNav = document.querySelector('#stepNav');
 const previousScreen = document.querySelector('#previousScreen');
 const nextScreen = document.querySelector('#nextScreen');
@@ -124,6 +144,7 @@ function setLocalizedText(element, value) {
 }
 
 function applyLanguage(language) {
+  rememberScroll();
   currentLanguage = translations[language] ? language : 'en';
   const copy = translations[currentLanguage];
   document.documentElement.lang = currentLanguage;
@@ -158,7 +179,12 @@ function applyLanguage(language) {
   if (quizComplete.hidden) renderQuestion(true);
   else renderCompletion();
   quizReviewContext.textContent = copy.knowledge.fromQuiz;
-  backToQuizResults.textContent = copy.knowledge.backResults;
+  backToQuizResults.textContent = activeModule === 'packing' && quizComplete.hidden ? copy.packing.ui.backQuestion : copy.knowledge.backResults;
+  moduleRegistry.forEach(module => module.render?.(currentLanguage));
+  renderModuleCards();
+  updateModuleCopy();
+  const screen = trainingScreens[activeScreen];
+  if (screen) screen.scrollTop = screenScroll.get(`${activeModule}:${screen.id}`) || 0;
 }
 
 function renderHandwritingAnswers() {
@@ -287,6 +313,7 @@ const reviewSections = {
 };
 
 function getReviewTitle(sectionId) {
+  if (activeModule !== 'peak') return moduleRegistry.get(activeModule).reviewTitle(sectionId, currentLanguage);
   const value = getValue(translations[currentLanguage], reviewSections[sectionId].titlePath);
   return value.includes('/') ? value.split('/').slice(1).join('/').trim() : value;
 }
@@ -347,8 +374,8 @@ function resetKnowledgeCheck() {
 }
 
 function renderQuestion(preserveAnswer = false) {
-  if (currentQuestion >= translations[currentLanguage].knowledge.questions.length) return;
-  const copy = translations[currentLanguage].knowledge;
+  if (currentQuestion >= knowledgeCopy().questions.length) return;
+  const copy = knowledgeCopy();
   const item = copy.questions[currentQuestion];
   questionCount.textContent = format(copy.question, {current:currentQuestion + 1,total:copy.questions.length});
   quizScore.textContent = `${score}/${copy.questions.length}`;
@@ -358,67 +385,133 @@ function renderQuestion(preserveAnswer = false) {
   answerFeedback.className = 'answer-feedback';
   answerFeedback.textContent = '';
   nextQuestion.classList.remove('show');
-  if (!preserveAnswer) selectedAnswer = null;
-  answered = preserveAnswer && selectedAnswer !== null;
+  if (!preserveAnswer) { selectedAnswer = null; answered = false; }
+  renderQuizExtras(item);
   item.a.forEach((answer, index) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = answer;
-    button.addEventListener('click', () => selectAnswer(index));
+    setQuizAnswerText(button, answer);
+    if (Array.isArray(item.correct)) {
+      button.setAttribute('aria-pressed', String(Array.isArray(selectedAnswer) && selectedAnswer.includes(index)));
+      button.addEventListener('click', () => toggleMultipleAnswer(index));
+    } else button.addEventListener('click', () => selectAnswer(index));
     scenarioAnswers.append(button);
   });
   if (answered) renderSelectedAnswer();
 }
 
-function renderSelectedAnswer() {
-  const copy = translations[currentLanguage].knowledge;
-  const item = copy.questions[currentQuestion];
-  const buttons = [...scenarioAnswers.querySelectorAll('button')];
-  buttons.forEach((button) => { button.disabled = true; });
-  buttons[item.correct].classList.add('correct');
-  const isCorrect = selectedAnswer === item.correct;
-  if (!isCorrect) buttons[selectedAnswer].classList.add('incorrect');
-  answerFeedback.textContent = `${isCorrect ? copy.correct : copy.incorrect} ${item.rule}`;
-  answerFeedback.className = `answer-feedback show ${isCorrect ? 'correct' : 'incorrect'}`;
-  nextQuestion.textContent = currentQuestion === copy.questions.length - 1 ? copy.result : copy.continue;
-  nextQuestion.classList.add('show');
+function setQuizAnswerText(element, text) {
+  if (activeModule === 'peak') { element.textContent = text; return; }
+  element.replaceChildren();
+  text.split(/(\b\d+(?:\/\d+)?\b)/g).forEach(part => {
+    if (/^\d/.test(part)) { const bdi = document.createElement('bdi'); bdi.dir = 'ltr'; bdi.textContent = part; element.append(bdi); }
+    else element.append(document.createTextNode(part));
+  });
 }
 
-function selectAnswer(selectedIndex) {
+function renderQuizExtras(item) {
+  const packing = activeModule === 'packing';
+  const ui = translations[currentLanguage].packing.ui;
+  const instruction = document.querySelector('#quizInstruction');
+  instruction.hidden = !packing;
+  instruction.textContent = Array.isArray(item.correct) ? ui.multi : ui.single;
+  const visual = document.querySelector('#quizVisual');
+  visual.hidden = !packing || !item.visual;
+  visual.innerHTML = packing && item.visual ? window.packingModule.visual(item.visual, currentLanguage) : '';
+  const submit = document.querySelector('#quizSubmit');
+  submit.hidden = !Array.isArray(item.correct) || answered;
+  submit.classList.toggle('show', !submit.hidden);
+  submit.textContent = ui.check;
+  submit.disabled = !Array.isArray(selectedAnswer) || selectedAnswer.length === 0;
+}
+
+function toggleMultipleAnswer(index) {
   if (answered) return;
-  answered = true;
-  selectedAnswer = selectedIndex;
-  const copy = translations[currentLanguage].knowledge;
+  const values = new Set(Array.isArray(selectedAnswer) ? selectedAnswer : []);
+  values.has(index) ? values.delete(index) : values.add(index);
+  selectedAnswer = [...values];
+  renderQuestion(true);
+}
+
+function answerIsCorrect(item, selection) {
+  return Array.isArray(item.correct)
+    ? Array.isArray(selection) && selection.length === item.correct.length && item.correct.every(i => selection.includes(i))
+    : selection === item.correct;
+}
+
+function renderSelectedAnswer() {
+  const copy = knowledgeCopy();
   const item = copy.questions[currentQuestion];
+  const correct = Array.isArray(item.correct) ? item.correct : [item.correct];
+  const selected = Array.isArray(selectedAnswer) ? selectedAnswer : [selectedAnswer];
   const buttons = [...scenarioAnswers.querySelectorAll('button')];
-  buttons.forEach((button) => { button.disabled = true; });
-  buttons[item.correct].classList.add('correct');
-  const isCorrect = selectedIndex === item.correct;
-  if (isCorrect) score += 1;
-  else { buttons[selectedIndex].classList.add('incorrect'); missed.push({question:currentQuestion}); }
-  quizScore.textContent = `${score}/${copy.questions.length}`;
+  buttons.forEach((button, index) => {
+    button.disabled = true;
+    button.classList.toggle('correct', correct.includes(index));
+    button.classList.toggle('incorrect', selected.includes(index) && !correct.includes(index));
+  });
+  const isCorrect = answerIsCorrect(item, selectedAnswer);
   answerFeedback.textContent = `${isCorrect ? copy.correct : copy.incorrect} ${item.rule}`;
+  if (!isCorrect && activeModule === 'packing') {
+    const ui = translations[currentLanguage].packing.ui;
+    answerFeedback.replaceChildren();
+    const chosen = document.createElement('p');
+    chosen.textContent = `${copy.incorrect} ${ui.selectedAnswer} ${item.a[selectedAnswer]}`;
+    const explanation = document.createElement('p');
+    explanation.textContent = `${ui.correctAnswer} ${item.rule}`;
+    const review = document.createElement('button');
+    review.type = 'button'; review.className = 'missed-rule-link';
+    review.textContent = getReviewTitle(item.relatedSection);
+    review.setAttribute('aria-label', format(copy.reviewLinkLabel, {title:review.textContent}));
+    review.addEventListener('click', () => openQuizReviewSection(item.relatedSection));
+    answerFeedback.append(chosen, explanation, review);
+  }
   answerFeedback.className = `answer-feedback show ${isCorrect ? 'correct' : 'incorrect'}`;
   nextQuestion.textContent = currentQuestion === copy.questions.length - 1 ? copy.result : copy.continue;
   nextQuestion.classList.add('show');
+  document.querySelector('#quizSubmit').hidden = true;
 }
+
+function selectAnswer(selection) {
+  if (answered) return;
+  answered = true;
+  selectedAnswer = selection;
+  const copy = knowledgeCopy();
+  if (answerIsCorrect(copy.questions[currentQuestion], selection)) score += 1;
+  else missed.push({ question: currentQuestion });
+  quizScore.textContent = `${score}/${copy.questions.length}`;
+  renderSelectedAnswer();
+}
+
+document.querySelector('#quizSubmit').addEventListener('click', () => {
+  if (Array.isArray(selectedAnswer) && selectedAnswer.length) selectAnswer([...selectedAnswer]);
+});
 
 nextQuestion.addEventListener('click', () => {
   currentQuestion += 1;
-  if (currentQuestion < translations[currentLanguage].knowledge.questions.length) renderQuestion();
+  document.querySelector('#knowledgeCheck').scrollTop = 0;
+  if (currentQuestion < knowledgeCopy().questions.length) renderQuestion();
   else { questionPanel.hidden = true; quizComplete.hidden = false; renderCompletion(); }
 });
 
+function quizReadiness(result, total) {
+  return result >= Math.ceil(total * 10 / 12) ? 'ready' : result >= Math.ceil(total * 7 / 12) ? 'almost' : 'reviewGuide';
+}
+
 function renderCompletion() {
-  const copy = translations[currentLanguage].knowledge;
+  const copy = knowledgeCopy();
   finalScore.textContent = `${score}/${copy.questions.length}`;
+  quizScore.textContent = finalScore.textContent;
+  questionCount.textContent = format(copy.question, {current:copy.questions.length,total:copy.questions.length});
+  quizProgress.style.width = '100%';
   missedRules.replaceChildren();
   const isPerfect = score === copy.questions.length;
-  const resultMessage = score >= 10 ? copy.ready : score >= 7 ? copy.almost : copy.reviewGuide;
+  const resultMessage = copy[quizReadiness(score, copy.questions.length)];
   setLocalizedText(completionHeading, resultMessage);
   perfectScoreMessage.hidden = !isPerfect;
   perfectScoreMessage.textContent = isPerfect ? copy.perfect : '';
-  if (isPerfect) playPerfectScoreCelebration();
+  if (isPerfect && moduleHome.hidden) playPerfectScoreCelebration();
+  updateModuleCopy();
   if (missed.length) {
     const heading = document.createElement('p');
     heading.className = 'missed-rules__heading';
@@ -443,20 +536,22 @@ function openQuizReviewSection(sectionId) {
   const targetIndex = trainingScreens.indexOf(section);
   if (targetIndex < 0) return;
   reviewTargetIndex = targetIndex;
-  quizReviewContext.textContent = translations[currentLanguage].knowledge.fromQuiz;
-  backToQuizResults.textContent = translations[currentLanguage].knowledge.backResults;
+  quizReviewContext.textContent = knowledgeCopy().fromQuiz;
+  backToQuizResults.textContent = activeModule === 'packing' && quizComplete.hidden ? translations[currentLanguage].packing.ui.backQuestion : knowledgeCopy().backResults;
   showScreen(targetIndex, targetIndex < activeScreen ? -1 : 1);
 }
 
 backToQuizResults.addEventListener('click', () => {
   reviewTargetIndex = null;
   quizReviewReturn.hidden = true;
+  document.body.classList.remove('is-reviewing');
   showScreen(trainingScreens.indexOf(document.querySelector('#knowledgeCheck')), 1);
-  renderCompletion();
+  if (quizComplete.hidden) renderQuestion(true); else renderCompletion();
 });
 
 function updateScreenNavigation() {
   if (!trainingScreens.length) return;
+  document.querySelector('#activeModuleLabel').textContent = moduleRegistry.get(activeModule).title(currentLanguage);
   screenCount.textContent = `${String(activeScreen + 1).padStart(2, '0')} / ${String(trainingScreens.length).padStart(2, '0')}`;
   [...screenDots.children].forEach((dot, index) => dot.classList.toggle('active', index <= activeScreen));
   previousScreen.disabled = activeScreen === 0;
@@ -464,25 +559,31 @@ function updateScreenNavigation() {
   const rtl = currentLanguage === 'he';
   previousScreen.textContent = rtl ? '→' : '←';
   nextScreen.textContent = rtl ? '←' : '→';
+  const navCopy = translations[currentLanguage].packing.ui;
+  previousScreen.setAttribute('aria-label', activeModule === 'packing' ? navCopy.previousScreen : 'Previous screen');
+  nextScreen.setAttribute('aria-label', activeModule === 'packing' ? navCopy.nextScreen : 'Next screen');
   const labelPath = trainingScreens[activeScreen].dataset.screenLabel;
   const label = labelPath ? getValue(translations[currentLanguage], labelPath) : '';
   stepNav.setAttribute('aria-label', label || translations[currentLanguage].meta.brand);
 }
 
 function showScreen(index, direction = 1, instant = false) {
+  rememberScroll();
   const target = Math.max(0, Math.min(trainingScreens.length - 1, index));
-  if (target === activeScreen && trainingScreens[target].classList.contains('is-active')) return;
+  if (!trainingScreens.length) return;
   trainingScreens.forEach((screen) => screen.classList.remove('is-active', 'from-next', 'from-previous'));
   activeScreen = target;
   const screen = trainingScreens[activeScreen];
   screen.classList.add('is-active');
-  quizReviewReturn.hidden = reviewTargetIndex === null || activeScreen !== reviewTargetIndex;
+  quizReviewReturn.hidden = reviewTargetIndex === null;
+  document.body.classList.toggle('is-reviewing', reviewTargetIndex !== null);
+  screen.scrollTop = screenScroll.get(`${activeModule}:${screen.id}`) || 0;
   if (!instant) screen.classList.add(direction >= 0 ? 'from-next' : 'from-previous');
   updateScreenNavigation();
 }
 
-previousScreen.addEventListener('click', () => showScreen(activeScreen - 1, -1));
-nextScreen.addEventListener('click', () => showScreen(activeScreen + 1, 1));
+previousScreen.addEventListener('click', () => { if (!navigationLocked()) showScreen(activeScreen - 1, -1); });
+nextScreen.addEventListener('click', () => { if (!navigationLocked()) showScreen(activeScreen + 1, 1); });
 
 document.querySelector('.scroll-cue').addEventListener('click', (event) => {
   event.preventDefault();
@@ -490,6 +591,7 @@ document.querySelector('.scroll-cue').addEventListener('click', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if (navigationLocked() || event.target.closest('input,select,textarea,[contenteditable=true]') || !languageMenu.hidden) return;
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
   const rtl = document.documentElement.dir === 'rtl';
   const moveNext = rtl ? event.key === 'ArrowLeft' : event.key === 'ArrowRight';
@@ -505,7 +607,7 @@ document.addEventListener('touchstart', (event) => {
 }, { passive:true });
 
 document.addEventListener('touchend', (event) => {
-  if (touchStartedOnControl || !event.changedTouches.length) return;
+  if (navigationLocked() || touchStartedOnControl || !event.changedTouches.length) return;
   const touch = event.changedTouches[0];
   const deltaX = touch.clientX - touchStartX;
   const deltaY = touch.clientY - touchStartY;
@@ -520,6 +622,98 @@ document.addEventListener('touchcancel', () => {
   touchStartY = 0;
   touchStartedOnControl = false;
 }, { passive:true });
+
+function saveModuleState() {
+  rememberScroll();
+  moduleStates.set(activeModule, { activeScreen, currentQuestion, score, missed: [...missed], answered,
+    selectedAnswer, celebrationPlayed, reviewTargetIndex, complete: !quizComplete.hidden });
+}
+
+function renderModuleCards() {
+  moduleCards.replaceChildren();
+  const copy = translations[currentLanguage].packing.ui;
+  ['packing','peak',...Array.from(moduleRegistry.keys()).filter(id=>!['packing','peak'].includes(id))].forEach(id => {
+    const module = moduleRegistry.get(id);
+    if (!module) return;
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'module-card'; button.dataset.module = id;
+    const title = document.createElement('strong'); title.textContent = module.title(currentLanguage);
+    const description = document.createElement('span'); description.textContent = module.description?.(currentLanguage) || '';
+    const count = document.createElement('small'); count.textContent = copy.metadata.replace('{pages}', module.screens.length - 1).replace('{questions}', module.knowledge(currentLanguage).questions.length);
+    if(currentLanguage==='ru'){
+      const form=(n,one,few,many)=>n%100>=11&&n%100<=14?many:n%10===1?one:n%10>=2&&n%10<=4?few:many;
+      count.textContent=count.textContent.replace('уроков',form(module.screens.length-1,'урок','урока','уроков')).replace('вопросов',form(module.knowledge(currentLanguage).questions.length,'вопрос','вопроса','вопросов'));
+    }
+    const top = document.createElement('span'); top.className = 'module-card__top';
+    const icon = document.createElement('span'); icon.className = 'module-card__icon'; icon.setAttribute('aria-hidden','true');
+    icon.innerHTML = id === 'packing'
+      ? '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10 16 4l11 6v12l-11 6L5 22Z M5 10l11 6 11-6 M16 16v12 M11 7l11 6"/><path d="m19 21 3 3 6-7" stroke-width="2.5"/></svg>'
+      : '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="17" r="11"/><path d="M16 10v7l5 3 M12 2h8 M16 2v4 M25 6l3 3"/></svg>';
+    top.append(icon);
+    if(id==='packing'){const badge=document.createElement('span');badge.className='module-card__badge';badge.textContent=copy.newBadge;top.append(badge);}
+    const bottom=document.createElement('span');bottom.className='module-card__bottom';
+    const arrow=document.createElement('span');arrow.className='module-card__arrow';arrow.textContent='→';arrow.setAttribute('aria-hidden','true');
+    bottom.append(count,arrow);
+    button.append(top,title, description, bottom);
+    button.addEventListener('click', () => enterModule(id));
+    moduleCards.append(button);
+  });
+}
+
+function updateModuleCopy() {
+  const packing = activeModule === 'packing';
+  const copy = knowledgeCopy();
+  document.querySelector('#knowledgeCheck').classList.toggle('packing-quiz', packing);
+  document.querySelector('#knowledgeCheck > .wrap > .step').textContent = packing ? translations[currentLanguage].packing.ui.packing : copy.step;
+  document.querySelector('#knowledgeCheck > .wrap > h2').textContent = copy.title;
+  document.querySelector('.knowledge-check__intro').textContent = copy.intro;
+  document.querySelector('#packingRetry').hidden = !packing;
+  document.querySelector('#packingRetry').textContent = translations[currentLanguage].packing.ui.restart;
+  const placeholder = document.querySelector('#photoQuizPlaceholder');
+  placeholder.hidden = true;
+  placeholder.replaceChildren();
+  document.title = moduleHome.hidden ? moduleRegistry.get(activeModule).title(currentLanguage) : translations[currentLanguage].packing.ui.topics;
+}
+
+function enterModule(id) {
+  saveModuleState();
+  document.querySelectorAll('[data-training-screen]').forEach(el => el.classList.remove('is-active'));
+  activeModule = id;
+  document.body.dataset.module = id;
+  trainingScreens = moduleRegistry.get(id).screens;
+  const state = moduleStates.get(id);
+  resetKnowledgeCheck();
+  activeScreen = 0;
+  if (state) {
+    ({ activeScreen, currentQuestion, score, missed, answered, selectedAnswer, celebrationPlayed, reviewTargetIndex } = state);
+    questionPanel.hidden = state.complete;
+    quizComplete.hidden = !state.complete;
+  }
+  moduleHome.hidden = true;
+  document.body.classList.remove('module-selecting');
+  screenDots.replaceChildren();
+  trainingScreens.forEach(() => screenDots.append(document.createElement('i')));
+  if (quizComplete.hidden) renderQuestion(true); else renderCompletion();
+  updateModuleCopy();
+  showScreen(activeScreen, 1, true);
+}
+
+moduleBack.addEventListener('click', () => {
+  saveModuleState(); removeCelebration();
+  moduleHome.hidden = false;
+  document.body.classList.add('module-selecting');
+  document.body.classList.remove('is-reviewing');
+  updateModuleCopy();
+  moduleCards.querySelector(`[data-module="${activeModule}"]`)?.focus();
+});
+document.querySelector('#packingRetry').addEventListener('click', () => {
+  resetKnowledgeCheck(); renderQuestion(); showScreen(trainingScreens.length - 1);
+});
+window.trainingApp = {
+  showQuiz: () => showScreen(trainingScreens.length - 1),
+  showLesson: id => { const index=trainingScreens.findIndex(screen=>screen.id===id);if(index>=0)showScreen(index); },
+  registerModule: module => { moduleRegistry.set(module.id, module); renderModuleCards(); }
+};
 
 trainingScreens.forEach(() => screenDots.append(document.createElement('i')));
 showScreen(0, 1, true);
